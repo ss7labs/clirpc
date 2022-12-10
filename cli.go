@@ -1,0 +1,5 @@
+package clirpc
+
+import (
+	"fmt"
+)
