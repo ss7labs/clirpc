@@ -3,6 +3,7 @@ package clirpc
 import (
 	"fmt"
 	"log"
+  "net"
 	"net/rpc"
 	"testing"
 	"time"
@@ -12,15 +13,42 @@ const (
 	srvAddr = "127.0.0.1:58085"
 )
 
-func startServer(stop chan bool) {
+type Listener struct {
+	Sleep time.Duration
+}
+
+func (l *Listener) GetUser(line []byte, ack *bool) (err error) {
+	fmt.Println(string(line))
+	return
+}
+
+func startServer(stop,started chan bool) {
 	fmt.Println("Started server")
-	<-stop
+
+  addr, err := net.ResolveTCPAddr("tcp", srvAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	inbound, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	listener := new(Listener)
+	rpc.Register(listener)
+	fmt.Println("server")
+	go rpc.Accept(inbound)
+  started<-true
+  <-stop
 }
 
 func TestServer(t *testing.T) {
 	var stopSrv chan bool
 	stopSrv = make(chan bool)
-	go startServer(stopSrv)
+  srvStarted := make(chan bool)
+	go startServer(stopSrv, srvStarted)
+  <-srvStarted
 
 	client, err := rpc.Dial("tcp", srvAddr)
 	if err != nil {
@@ -35,7 +63,6 @@ func TestServer(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	time.Sleep(1 * time.Second)
 	stopSrv <- true
 	fmt.Println("testing done")
 }
