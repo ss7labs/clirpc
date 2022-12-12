@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/user"
   "regexp"
+  "net/rpc"
 )
 
 type customPrompt struct {
@@ -16,14 +17,24 @@ type customPrompt struct {
 	h string
 }
 
+type Remotes struct {
+  conns []*rpc.Client
+}
+func (r *Remotes) Connect(){
+}
+
 func main() {
-	cp := &customPrompt{}
+//tcp connections will be permanent
+  rmt := &Remotes{}
+  rmt.Connect()
+
+  cp := &customPrompt{}
 	cp.createPrompt()
 
 	cfg := &readline.Config{Prompt: cp.p}
 	shell := ishell.NewWithConfig(cfg)
 
-	addCommands(shell)
+	addCommands(shell,rmt)
 
   // when started with "exit" as first argument, assume non-interactive execution
 	if len(os.Args) > 1 && os.Args[1] == "exit" {
@@ -37,7 +48,7 @@ func main() {
 	}
 }
 
-func addCommands(sh *ishell.Shell) {
+func addCommands(sh *ishell.Shell, r *Remotes) {
 	showCmd := &ishell.Cmd{
 		Name: "show",
 		Help: "Show running system information",
@@ -50,7 +61,7 @@ func addCommands(sh *ishell.Shell) {
         c.Err(errors.New("no login/username"))
 				return
 			}
-      showByMac(c)
+      r.showUser(c)
 		},
 	})
 	showCmd.AddCmd(&ishell.Cmd{
@@ -61,7 +72,7 @@ func addCommands(sh *ishell.Shell) {
         c.Err(errors.New("no login/username"))
 				return
 			}
-      showByLogin(c)
+      r.showUser(c)
 		},
 	})
 	showCmd.AddCmd(&ishell.Cmd{
@@ -82,7 +93,7 @@ func addCommands(sh *ishell.Shell) {
         c.Err(errors.New("no login/username"))
 				return
 			}
-      discByLogin(c)
+      r.discUser(c)
 		},
   })
   discCmd.AddCmd(&ishell.Cmd{
@@ -93,7 +104,7 @@ func addCommands(sh *ishell.Shell) {
         c.Err(errors.New("no mac address"))
 				return
 			}
-      discByMac(c)
+      r.discUser(c)
 		},
   })
 	sh.AddCmd(discCmd)
@@ -107,7 +118,7 @@ func checkUserMac(str string) error {
   return nil
 }
 
-func showByMac(c *ishell.Context){
+func (r *Remotes) showUser(c *ishell.Context){
   var args []string
   args = c.Args
   if err := checkUserMac(args[0]); err != nil {
@@ -116,25 +127,7 @@ func showByMac(c *ishell.Context){
 	}
 }
 
-func showByLogin(c *ishell.Context){
-  var args []string
-  args = c.Args
-  if err := checkUserMac(args[0]); err != nil {
-		c.Err(err)
-		return 
-	}
-}
-
-func discByMac(c *ishell.Context){
-  var args []string
-  args = c.Args
-  if err := checkUserMac(args[0]); err != nil {
-		c.Err(err)
-		return 
-	}
-}
-
-func discByLogin(c *ishell.Context){
+func (r *Remotes) discUser(c *ishell.Context){
   var args []string
   args = c.Args
   if err := checkUserMac(args[0]); err != nil {

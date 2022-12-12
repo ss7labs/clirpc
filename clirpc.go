@@ -1,5 +1,5 @@
 package clirpc
 
 import (
-	"fmt"
+	_ "fmt"
 )
