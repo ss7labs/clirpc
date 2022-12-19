@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/user"
   "regexp"
-  "net/rpc"
+  _ "net/rpc"
 )
 
 type customPrompt struct {
@@ -18,15 +18,48 @@ type customPrompt struct {
 }
 
 type Remotes struct {
-  conns []*rpc.Client
+  rmt map[string]string
+  port string = "58085"
 }
-func (r *Remotes) Connect(){
+func (r *Remotes) Init(){
+  r.rmt = make(map[string]string)
+  r.rmt["55-bras"]="10.19.176.55"
+  r.rmt["02-bras"]="10.19.132.2"
+  r.rmt["04-bras"]="10.19.132.4"
+}
+
+func (r *Remotes) showUser(c *ishell.Context){
+  var args []string
+  args = c.Args
+  if err := checkUserMac(args[0]); err != nil {
+		c.Err(err)
+		return 
+	}
+  r.RemoteCall("show",args[0])
+}
+
+func (r *Remotes) RemoteCall(cmd,user string){
+  for h,ip := range r.rmt {
+    client, err := rpc.Dial("tcp", srvAddr)
+    if err != nil {
+       log.Fatal(err)
+    }
+  }
+}
+
+func (r *Remotes) discUser(c *ishell.Context){
+  var args []string
+  args = c.Args
+  if err := checkUserMac(args[0]); err != nil {
+		c.Err(err)
+		return 
+	}
 }
 
 func main() {
 //tcp connections will be permanent
   rmt := &Remotes{}
-  rmt.Connect()
+  rmt.Init()
 
   cp := &customPrompt{}
 	cp.createPrompt()
@@ -118,23 +151,6 @@ func checkUserMac(str string) error {
   return nil
 }
 
-func (r *Remotes) showUser(c *ishell.Context){
-  var args []string
-  args = c.Args
-  if err := checkUserMac(args[0]); err != nil {
-		c.Err(err)
-		return 
-	}
-}
-
-func (r *Remotes) discUser(c *ishell.Context){
-  var args []string
-  args = c.Args
-  if err := checkUserMac(args[0]); err != nil {
-		c.Err(err)
-		return 
-	}
-}
 
 func (cp *customPrompt) createPrompt() {
 	info := color.New(color.FgBlack, color.BgWhite).SprintFunc()

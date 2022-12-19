@@ -1,8 +1,5 @@
 package clirpc
 
-import (
-	_ "fmt"
-)
 
 type RawSession struct {
 	vif_id,
@@ -22,3 +19,8 @@ type RawSession struct {
 	tx_bytes,
 	uptime string
 }
+type Rcli interface {
+  FindUserSession(user string) (RawSession,error)
+  DiscUserSession(user string) error
+}
+

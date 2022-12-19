@@ -30,7 +30,6 @@ func (l *Listener) GetUser(line []byte, ack *bool) (err error) {
 }
 
 func startServer(stop, started chan bool) {
-	fmt.Println("Started server")
 
 	addr, err := net.ResolveTCPAddr("tcp", srvAddr)
 	if err != nil {
@@ -44,7 +43,7 @@ func startServer(stop, started chan bool) {
 
 	listener := new(Listener)
 	rpc.Register(listener)
-	fmt.Println("server")
+	fmt.Println("Started server")
 	go rpc.Accept(inbound)
 	started <- true
 	<-stop
