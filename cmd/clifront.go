@@ -1,75 +1,94 @@
 package main
 
 import (
+	"clirpc"
 	"errors"
 	"fmt"
 	"github.com/abiosoft/ishell/v2"
 	"github.com/abiosoft/readline"
 	"github.com/fatih/color"
+	"net/rpc"
 	"os"
 	"os/user"
-  "regexp"
-  _ "net/rpc"
+	"regexp"
 )
-
 type customPrompt struct {
-	p string
-	h string
+       p string
+       h string
 }
 
 type Remotes struct {
-  rmt map[string]string
-  port string = "58085"
-}
-func (r *Remotes) Init(){
-  r.rmt = make(map[string]string)
-  r.rmt["55-bras"]="10.19.176.55"
-  r.rmt["02-bras"]="10.19.132.2"
-  r.rmt["04-bras"]="10.19.132.4"
+	rmt map[string]string
 }
 
-func (r *Remotes) showUser(c *ishell.Context){
-  var args []string
-  args = c.Args
-  if err := checkUserMac(args[0]); err != nil {
+func (r *Remotes) Init() {
+	r.rmt = make(map[string]string)
+	/*
+		r.rmt["55-bras"] = "10.19.176.55"
+		r.rmt["02-bras"] = "10.19.132.2"
+		r.rmt["04-bras"] = "10.19.132.4"
+	*/
+	r.rmt["local"] = "127.0.0.1"
+}
+
+func (r *Remotes) showUser(c *ishell.Context) {
+	var args []string
+	args = c.Args
+	if err := checkUserMac(args[0]); err != nil {
 		c.Err(err)
-		return 
+		return
 	}
-  r.RemoteCall("show",args[0])
+	r.RemoteCall("show", args[0])
 }
 
-func (r *Remotes) RemoteCall(cmd,user string){
-  for h,ip := range r.rmt {
-    client, err := rpc.Dial("tcp", srvAddr)
-    if err != nil {
-       log.Fatal(err)
-    }
-  }
+func (r *Remotes) RemoteCall(cmd, user string) {
+	for h, ip := range r.rmt {
+		if cmd == "show" {
+			shUser(h, ip, user)
+		}
+	}
 }
 
-func (r *Remotes) discUser(c *ishell.Context){
-  var args []string
-  args = c.Args
-  if err := checkUserMac(args[0]); err != nil {
+func shUser(h, ip, user string) error {
+	srvAddr := ip + ":" + clirpc.DefPort
+	client, err := rpc.Dial("tcp", srvAddr)
+	if err != nil {
+		return err
+	}
+  defer client.Close()
+ 	var reply bool
+	var line []byte
+	line = []byte(user)
+	err = client.Call("Listener.GetUser", line, &reply)
+	if err != nil {
+		return err
+	}
+  return nil
+}
+
+func (r *Remotes) discUser(c *ishell.Context) {
+	var args []string
+	args = c.Args
+	if err := checkUserMac(args[0]); err != nil {
 		c.Err(err)
-		return 
+		return
 	}
 }
 
 func main() {
-//tcp connections will be permanent
-  rmt := &Remotes{}
-  rmt.Init()
+	//tcp connections will be permanent
+	rmt := &Remotes{}
+	rmt.Init()
 
-  cp := &customPrompt{}
+	cp := &customPrompt{}
 	cp.createPrompt()
 
 	cfg := &readline.Config{Prompt: cp.p}
 	shell := ishell.NewWithConfig(cfg)
 
-	addCommands(shell,rmt)
+	addCommands(shell, rmt)
 
-  // when started with "exit" as first argument, assume non-interactive execution
+	// when started with "exit" as first argument, assume non-interactive execution
 	if len(os.Args) > 1 && os.Args[1] == "exit" {
 		shell.Process(os.Args[2:]...)
 	} else {
@@ -91,10 +110,10 @@ func addCommands(sh *ishell.Shell, r *Remotes) {
 		Help: "Show user info by mac address",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 0 {
-        c.Err(errors.New("no login/username"))
+				c.Err(errors.New("no login/username"))
 				return
 			}
-      r.showUser(c)
+			r.showUser(c)
 		},
 	})
 	showCmd.AddCmd(&ishell.Cmd{
@@ -102,10 +121,10 @@ func addCommands(sh *ishell.Shell, r *Remotes) {
 		Help: "Show user info by login/username",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 0 {
-        c.Err(errors.New("no login/username"))
+				c.Err(errors.New("no login/username"))
 				return
 			}
-      r.showUser(c)
+			r.showUser(c)
 		},
 	})
 	showCmd.AddCmd(&ishell.Cmd{
@@ -118,39 +137,39 @@ func addCommands(sh *ishell.Shell, r *Remotes) {
 		Name: "disconnect",
 		Help: "Disconnect session",
 	}
-  discCmd.AddCmd(&ishell.Cmd{
-    Name: "login",
-    Help: "Disconnect session by login/username",
+	discCmd.AddCmd(&ishell.Cmd{
+		Name: "login",
+		Help: "Disconnect session by login/username",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 0 {
-        c.Err(errors.New("no login/username"))
+				c.Err(errors.New("no login/username"))
 				return
 			}
-      r.discUser(c)
+			r.discUser(c)
 		},
-  })
-  discCmd.AddCmd(&ishell.Cmd{
-    Name: "mac",
-    Help: "Disconnect session by mac address",
+	})
+	discCmd.AddCmd(&ishell.Cmd{
+		Name: "mac",
+		Help: "Disconnect session by mac address",
 		Func: func(c *ishell.Context) {
 			if len(c.Args) == 0 {
-        c.Err(errors.New("no mac address"))
+				c.Err(errors.New("no mac address"))
 				return
 			}
-      r.discUser(c)
+			r.discUser(c)
 		},
-  })
+	})
 	sh.AddCmd(discCmd)
 }
+
 var unamePatt *regexp.Regexp = regexp.MustCompile("^[0-9]{6}@gts$|^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
 
 func checkUserMac(str string) error {
-  if !unamePatt.MatchString(str) {
-    return errors.New("user should be like as 490036@gts or 3D:F2:C9:A6:B3:4F")
-  }
-  return nil
+	if !unamePatt.MatchString(str) {
+		return errors.New("user should be like as 490036@gts or 3D:F2:C9:A6:B3:4F")
+	}
+	return nil
 }
-
 
 func (cp *customPrompt) createPrompt() {
 	info := color.New(color.FgBlack, color.BgWhite).SprintFunc()
