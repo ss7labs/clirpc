@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"regexp"
+  "strings"
 )
 type customPrompt struct {
        p string
@@ -19,16 +20,14 @@ type customPrompt struct {
 
 type Remotes struct {
 	rmt map[string]string
+  rs *clirpc.RawSession
 }
 
 func (r *Remotes) Init() {
 	r.rmt = make(map[string]string)
-	/*
-		r.rmt["55-bras"] = "10.19.176.55"
-		r.rmt["02-bras"] = "10.19.132.2"
-		r.rmt["04-bras"] = "10.19.132.4"
-	*/
-	r.rmt["local"] = "127.0.0.1"
+	r.rmt["02-bras"] = "10.19.132.2"
+	r.rmt["04-bras"] = "10.19.132.4"
+	r.rmt["55-bras"] = "10.19.176.55"
 }
 
 func (r *Remotes) showUser(c *ishell.Context) {
@@ -39,30 +38,86 @@ func (r *Remotes) showUser(c *ishell.Context) {
 		return
 	}
 	r.RemoteCall("show", args[0])
+  if r.rs == nil {
+    return
+  }
+
+  blocked := false
+  if r.rs.IngressCir == "-" {
+    blocked = true
+  }
+  
+  yellow := color.New(color.FgYellow).SprintFunc()
+  boldGreen := color.New(color.FgGreen, color.Bold).SprintFunc()
+  
+  if blocked {
+    boldRed := color.New(color.FgRed, color.Bold).SprintFunc()
+    c.Printf("%s %s %s %s%s %s%s %s\n",r.rs.Username, yellow(r.rs.Mac), r.rs.IpAddr,boldGreen("SVID:"),r.rs.Svid,boldGreen("CVID:"), r.rs.Cvid, boldRed("BLOCKED"))
+  } else {
+    cyan := color.New(color.FgCyan).SprintFunc()
+    magenta := color.New(color.FgMagenta).SprintFunc()
+    wtB := color.New(color.FgWhite,color.Bold).SprintFunc()
+    wtHi := color.New(color.FgHiWhite,color.Bold).SprintFunc()
+    up := strings.Split(r.rs.IngressCir,";")
+    dn := strings.Split(r.rs.EgressCir,";")
+    c.Printf("%s %s %s %s %s%s %s%s %s%s%s %s%s%s\n",magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac),r.rs.IpAddr,boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"),r.rs.Cvid, boldGreen("UP:"),wtB(up[0])+";",cyan(up[1]+"(TT)"),boldGreen("DN:"), wtB(dn[0])+";",cyan(dn[1]+"(TT)"))
+  }
+  r.rs = nil
 }
 
 func (r *Remotes) RemoteCall(cmd, user string) {
+  var err error
 	for h, ip := range r.rmt {
 		if cmd == "show" {
-			shUser(h, ip, user)
+			err = r.shUser(ip, user)
+      if err == nil {
+        r.rs.Host = h
+        break
+      }
+		}
+		if cmd == "disc" {
+			err = discUser(ip, user)
+      if err == nil {
+        break
+      }
 		}
 	}
 }
 
-func shUser(h, ip, user string) error {
+func (r *Remotes) shUser(ip, user string) error {
 	srvAddr := ip + ":" + clirpc.DefPort
 	client, err := rpc.Dial("tcp", srvAddr)
 	if err != nil {
 		return err
 	}
   defer client.Close()
- 	var reply bool
+  reply := new(clirpc.RawSession)
 	var line []byte
 	line = []byte(user)
-	err = client.Call("Listener.GetUser", line, &reply)
+  showCall := client.Go("Listener.GetUser", line, reply,nil)
+  <-showCall.Done
+  if showCall.Error != nil {
+    return showCall.Error
+  }
+  r.rs = reply
+  return nil
+}
+
+func discUser(ip, user string) error {
+	srvAddr := ip + ":" + clirpc.DefPort
+	client, err := rpc.Dial("tcp", srvAddr)
 	if err != nil {
 		return err
 	}
+  defer client.Close()
+  reply := false
+	var line []byte
+	line = []byte(user)
+  call := client.Go("Listener.DiscUser", line, &reply,nil)
+  <-call.Done
+  if call.Error != nil {
+    return call.Error
+  }
   return nil
 }
 
@@ -73,6 +128,7 @@ func (r *Remotes) discUser(c *ishell.Context) {
 		c.Err(err)
 		return
 	}
+	r.RemoteCall("disc", args[0])
 }
 
 func main() {
