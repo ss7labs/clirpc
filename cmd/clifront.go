@@ -28,6 +28,10 @@ func (r *Remotes) Init() {
 	r.rmt["02-bras"] = "10.19.132.2"
 	r.rmt["04-bras"] = "10.19.132.4"
 	r.rmt["55-bras"] = "10.19.176.55"
+	r.rmt["bng-a46"] = "10.20.14.15"
+	r.rmt["bng-a33"] = "10.20.221.219"
+	r.rmt["bng-a34"] = "10.20.218.221"
+	r.rmt["bng-a27"] = "10.20.55.237"
 }
 
 func (r *Remotes) showUser(c *ishell.Context) {
@@ -60,7 +64,8 @@ func (r *Remotes) showUser(c *ishell.Context) {
     wtHi := color.New(color.FgHiWhite,color.Bold).SprintFunc()
     up := strings.Split(r.rs.IngressCir,";")
     dn := strings.Split(r.rs.EgressCir,";")
-    c.Printf("%s %s %s %s %s%s %s%s %s%s%s %s%s%s\n",magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac),r.rs.IpAddr,boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"),r.rs.Cvid, boldGreen("UP:"),wtB(up[0])+";",cyan(up[1]+"(TT)"),boldGreen("DN:"), wtB(dn[0])+";",cyan(dn[1]+"(TT)"))
+    outFmt := "%s %s %s %s %s%s %s%s %s%s%s %s%s%s %s%s\n"
+    c.Printf(outFmt,magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac),r.rs.IpAddr,boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"),r.rs.Cvid, boldGreen("UP:"),wtB(up[0])+";",cyan(up[1]+"(TT)"),boldGreen("DN:"), wtB(dn[0])+";",cyan(dn[1]+"(TT)"),yellow("MTU:"),wtHi(r.rs.Mtu))
   }
   r.rs = nil
 }
