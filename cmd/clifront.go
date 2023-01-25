@@ -7,20 +7,26 @@ import (
 	"github.com/abiosoft/ishell/v2"
 	"github.com/abiosoft/readline"
 	"github.com/fatih/color"
+	"github.com/go-ping/ping"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"net/rpc"
 	"os"
 	"os/user"
 	"regexp"
-  "strings"
+	"strconv"
+	"strings"
+	"time"
 )
+
 type customPrompt struct {
-       p string
-       h string
+	p string
+	h string
 }
 
 type Remotes struct {
 	rmt map[string]string
-  rs *clirpc.RawSession
+	rs  *clirpc.RawSession
 }
 
 func (r *Remotes) Init() {
@@ -42,70 +48,106 @@ func (r *Remotes) showUser(c *ishell.Context) {
 		return
 	}
 	r.RemoteCall("show", args[0])
-  if r.rs == nil {
-    return
-  }
+	if r.rs == nil {
+		return
+	}
 
-  blocked := false
-  if r.rs.IngressCir == "-" {
-    blocked = true
-  }
-  
-  yellow := color.New(color.FgYellow).SprintFunc()
-  boldGreen := color.New(color.FgGreen, color.Bold).SprintFunc()
-  
-  if blocked {
-    boldRed := color.New(color.FgRed, color.Bold).SprintFunc()
-    c.Printf("%s %s %s %s%s %s%s %s\n",r.rs.Username, yellow(r.rs.Mac), r.rs.IpAddr,boldGreen("SVID:"),r.rs.Svid,boldGreen("CVID:"), r.rs.Cvid, boldRed("BLOCKED"))
-  } else {
-    cyan := color.New(color.FgCyan).SprintFunc()
-    magenta := color.New(color.FgMagenta).SprintFunc()
-    wtB := color.New(color.FgWhite,color.Bold).SprintFunc()
-    wtHi := color.New(color.FgHiWhite,color.Bold).SprintFunc()
-    up := strings.Split(r.rs.IngressCir,";")
-    dn := strings.Split(r.rs.EgressCir,";")
-    outFmt := "%s %s %s %s %s%s %s%s %s%s%s %s%s%s %s%s\n"
-    c.Printf(outFmt,magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac),r.rs.IpAddr,boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"),r.rs.Cvid, boldGreen("UP:"),wtB(up[0])+";",cyan(up[1]+"(TT)"),boldGreen("DN:"), wtB(dn[0])+";",cyan(dn[1]+"(TT)"),yellow("MTU:"),wtHi(r.rs.Mtu))
-  }
-  r.rs = nil
+	blocked := false
+	if r.rs.IngressCir == "-" {
+		blocked = true
+	}
+
+	yellow := color.New(color.FgYellow).SprintFunc()
+	boldGreen := color.New(color.FgGreen, color.Bold).SprintFunc()
+
+	if blocked {
+		boldRed := color.New(color.FgRed, color.Bold).SprintFunc()
+		c.Printf("%s %s %s %s%s %s%s %s\n", r.rs.Username, yellow(r.rs.Mac), r.rs.IpAddr, boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"), r.rs.Cvid, boldRed("BLOCKED"))
+	} else {
+		cyan := color.New(color.FgCyan).SprintFunc()
+		magenta := color.New(color.FgMagenta).SprintFunc()
+		wtB := color.New(color.FgWhite, color.Bold).SprintFunc()
+		wtHi := color.New(color.FgHiWhite, color.Bold).SprintFunc()
+		up := strings.Split(r.rs.IngressCir, ";")
+		dn := strings.Split(r.rs.EgressCir, ";")
+		outFmt := "%s %s %s %s %s%s %s%s %s%s%s %s%s%s %s%s\n"
+		c.Printf(outFmt, magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac), r.rs.IpAddr, boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"), r.rs.Cvid, boldGreen("UP:"), wtB(up[0])+";", cyan(up[1]+"(TT)"), boldGreen("DN:"), wtB(dn[0])+";", cyan(dn[1]+"(TT)"), yellow("MTU:"), wtHi(r.rs.Mtu))
+	}
+	r.rs = nil
 }
 
 func (r *Remotes) RemoteCall(cmd, user string) {
-  var err error
+	var err error
 	for h, ip := range r.rmt {
 		if cmd == "show" {
 			err = r.shUser(ip, user)
-      if err == nil {
-        r.rs.Host = h
-        break
-      }
+			if err == nil {
+				r.rs.Host = h
+				break
+			}
 		}
 		if cmd == "disc" {
 			err = discUser(ip, user)
-      if err == nil {
-        break
-      }
+			if err == nil {
+				break
+			}
 		}
 	}
 }
-
-func (r *Remotes) shUser(ip, user string) error {
-	srvAddr := ip + ":" + clirpc.DefPort
-	client, err := rpc.Dial("tcp", srvAddr)
+func checkHostAvail(host string) error {
+	var rcvd int
+	pinger, err := ping.NewPinger(host)
 	if err != nil {
 		return err
 	}
-  defer client.Close()
-  reply := new(clirpc.RawSession)
+	pinger.Count = 1
+	pinger.Timeout = time.Second * 1
+	pinger.OnFinish = func(stats *ping.Statistics) {
+		/*
+			fmt.Printf("\n--- %s ping statistics ---\n", stats.Addr)
+			fmt.Printf("%d packets transmitted, %d packets received, %d duplicates, %v%% packet loss\n",
+				stats.PacketsSent, stats.PacketsRecv, stats.PacketsRecvDuplicates, stats.PacketLoss)
+			fmt.Printf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
+				stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
+		*/
+		log.Trace().Msg(stats.Addr + " packets received " + strconv.Itoa(stats.PacketsRecv))
+		rcvd = stats.PacketsRecv
+	}
+
+	err = pinger.Run()
+	if err != nil {
+		return err
+	}
+	//fmt.Println("PING ", err, pinger.IPAddr(),rcvd)
+	if rcvd == 0 {
+		err = errors.New("Host not available")
+		return err
+	}
+	return nil
+}
+func (r *Remotes) shUser(ip, user string) error {
+	err := checkHostAvail(ip)
+
+	if err != nil {
+		return err
+	}
+	srvAddr := ip + ":" + clirpc.DefPort
+	client, err := rpc.Dial("tcp", srvAddr)
+	if err != nil {
+		log.Trace().Msg(srvAddr + " Dial failed")
+		return err
+	}
+	defer client.Close()
+	reply := new(clirpc.RawSession)
 	var line []byte
 	line = []byte(user)
-  showCall := client.Go("Listener.GetUser", line, reply,nil)
-  <-showCall.Done
-  if showCall.Error != nil {
-    return showCall.Error
-  }
-  r.rs = reply
-  return nil
+	showCall := client.Go("Listener.GetUser", line, reply, nil)
+	<-showCall.Done
+	if showCall.Error != nil {
+		return showCall.Error
+	}
+	r.rs = reply
+	return nil
 }
 
 func discUser(ip, user string) error {
@@ -114,16 +156,16 @@ func discUser(ip, user string) error {
 	if err != nil {
 		return err
 	}
-  defer client.Close()
-  reply := false
+	defer client.Close()
+	reply := false
 	var line []byte
 	line = []byte(user)
-  call := client.Go("Listener.DiscUser", line, &reply,nil)
-  <-call.Done
-  if call.Error != nil {
-    return call.Error
-  }
-  return nil
+	call := client.Go("Listener.DiscUser", line, &reply, nil)
+	<-call.Done
+	if call.Error != nil {
+		return call.Error
+	}
+	return nil
 }
 
 func (r *Remotes) discUser(c *ishell.Context) {
@@ -137,6 +179,7 @@ func (r *Remotes) discUser(c *ishell.Context) {
 }
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	//tcp connections will be permanent
 	rmt := &Remotes{}
 	rmt.Init()
@@ -149,9 +192,14 @@ func main() {
 
 	addCommands(shell, rmt)
 
+	if len(os.Args) > 1 && os.Args[1] == "--trace" {
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
 	// when started with "exit" as first argument, assume non-interactive execution
 	if len(os.Args) > 1 && os.Args[1] == "exit" {
 		shell.Process(os.Args[2:]...)
+	} else if len(os.Args) > 2 && os.Args[2] == "exit" {
+		shell.Process(os.Args[3:]...)
 	} else {
 		shell.Println(cp.h)
 		// start shell

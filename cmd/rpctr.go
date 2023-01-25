@@ -1,13 +1,13 @@
 package main
 
 import (
+	"clirpc"
+	"fmt"
 	"github.com/joho/godotenv"
 	"log"
+	"net"
+	"net/rpc"
 	"os"
-  "fmt"
-  "clirpc"
-  "net"
-  "net/rpc"
 )
 
 func main() {
@@ -15,11 +15,11 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-  port := os.Getenv("PORT")
-  addr := os.Getenv("ADDR")
+	port := os.Getenv("PORT")
+	addr := os.Getenv("ADDR")
 
-  bind := addr+":"+port
-  bindaddr, err := net.ResolveTCPAddr("tcp", bind)
+	bind := addr + ":" + port
+	bindaddr, err := net.ResolveTCPAddr("tcp", bind)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,4 +34,3 @@ func main() {
 	fmt.Println("Started server for ", bind)
 	rpc.Accept(inbound)
 }
-
