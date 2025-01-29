@@ -1,7 +1,6 @@
 package clirpc
 
 import (
-	"context"
 	"testing"
 )
 
@@ -23,17 +22,5 @@ func TestNewRadiusConfig(t *testing.T) {
 	}
 	if config.Username != "0:0:130" {
 		t.Errorf("expected username 0:0:130, got %s", config.Username)
-	}
-}
-
-func TestSendRadiusDisconnect(t *testing.T) {
-	t.Skip("This test requires a running RADIUS server")
-
-	ctx := context.Background()
-	config := NewRadiusConfig("192.168.3.1", 3799, "secret")
-
-	err := SendRadiusDisconnect(ctx, config)
-	if err != nil {
-		t.Errorf("SendRadiusDisconnect failed: %v", err)
 	}
 }
