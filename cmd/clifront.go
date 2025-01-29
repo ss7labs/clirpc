@@ -2,6 +2,7 @@ package main
 
 import (
 	"clirpc"
+	"context"
 	"errors"
 	"fmt"
 	"net/rpc"
@@ -27,6 +28,7 @@ type customPrompt struct {
 
 type Remotes struct {
 	rmt map[string]string
+	coa map[string]string
 	rs  *clirpc.RawSession
 }
 
@@ -37,6 +39,12 @@ func (r *Remotes) Init() {
 	r.rmt["bng-a33"] = "10.20.221.219"
 	r.rmt["bng-a34"] = "10.168.42.35"
 	r.rmt["bng-a27"] = "10.20.55.237"
+	r.coa = make(map[string]string)
+	r.coa["55-bras"] = "129.9.7.13"
+	r.coa["bng-a46"] = "129.9.7.15"
+	r.coa["bng-a33"] = "129.9.7.16"
+	r.coa["bng-a34"] = "129.9.7.17"
+	r.coa["bng-a27"] = "129.9.7.18"
 }
 
 func (r *Remotes) showUser(c *ishell.Context) {
@@ -120,7 +128,7 @@ func checkHostAvail(host string) error {
 	}
 	//fmt.Println("PING ", err, pinger.IPAddr(),rcvd)
 	if rcvd == 0 {
-		err = errors.New("Host not available")
+		err = errors.New("host not available")
 		return err
 	}
 	return nil
@@ -175,7 +183,36 @@ func (r *Remotes) discUser(c *ishell.Context) {
 		c.Err(err)
 		return
 	}
+	if ok := coaDisconnect(args[0], r.coa); ok == nil {
+		return
+	}
+
 	r.RemoteCall("disc", args[0])
+}
+
+func coaDisconnect(user string, coa map[string]string) error {
+	var config clirpc.RadiusConfig
+	var err error
+	config.Secret = "secret_3128"
+	config.Port = 3799
+	for _, ip := range coa {
+		config.Host = ip
+		config.Username = user
+		err = clirpc.SendRadiusDisconnect(context.Background(), config)
+		if err == nil {
+			break
+		}
+	}
+	/*
+		{
+		config: RadiusConfig{
+			Host:     "127.0.0.1",
+			Port:     addr.Port,
+			Secret:   "testing123",
+			Username: user,
+		}
+	*/
+	return err
 }
 
 func main() {
