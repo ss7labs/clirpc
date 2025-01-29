@@ -56,6 +56,13 @@ func (l *Listener) GetUser(line []byte, reply *RawSession) (err error) {
 		return
 	}
 	s := strings.Split(string(out), "\t")
+	if len(s) <= 1 {
+		s = strings.Split(string(out), " ")
+	}
+	if len(s) <= 1 {
+		return
+	}
+
 	reply.VifId = s[0]
 	reply.Username = s[1]
 	reply.Mac = s[2]

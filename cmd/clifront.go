@@ -4,12 +4,6 @@ import (
 	"clirpc"
 	"errors"
 	"fmt"
-	"github.com/abiosoft/ishell/v2"
-	"github.com/abiosoft/readline"
-	"github.com/fatih/color"
-	"github.com/go-ping/ping"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"net/rpc"
 	"os"
 	"os/user"
@@ -17,6 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/abiosoft/ishell/v2"
+	"github.com/abiosoft/readline"
+	"github.com/fatih/color"
+	"github.com/go-ping/ping"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type customPrompt struct {
@@ -31,12 +32,10 @@ type Remotes struct {
 
 func (r *Remotes) Init() {
 	r.rmt = make(map[string]string)
-	r.rmt["02-bras"] = "10.19.132.2"
-	r.rmt["04-bras"] = "10.19.132.4"
 	r.rmt["55-bras"] = "10.19.176.55"
 	r.rmt["bng-a46"] = "10.20.14.15"
 	r.rmt["bng-a33"] = "10.20.221.219"
-	r.rmt["bng-a34"] = "10.20.218.221"
+	r.rmt["bng-a34"] = "10.168.42.35"
 	r.rmt["bng-a27"] = "10.20.55.237"
 }
 
@@ -69,9 +68,10 @@ func (r *Remotes) showUser(c *ishell.Context) {
 		wtB := color.New(color.FgWhite, color.Bold).SprintFunc()
 		wtHi := color.New(color.FgHiWhite, color.Bold).SprintFunc()
 		up := strings.Split(r.rs.IngressCir, ";")
+		upTT := up[1]
 		dn := strings.Split(r.rs.EgressCir, ";")
 		outFmt := "%s %s %s %s %s%s %s%s %s%s%s %s%s%s %s%s\n"
-		c.Printf(outFmt, magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac), r.rs.IpAddr, boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"), r.rs.Cvid, boldGreen("UP:"), wtB(up[0])+";", cyan(up[1]+"(TT)"), boldGreen("DN:"), wtB(dn[0])+";", cyan(dn[1]+"(TT)"), yellow("MTU:"), wtHi(r.rs.Mtu))
+		c.Printf(outFmt, magenta(r.rs.Host), wtHi(r.rs.Username), yellow(r.rs.Mac), r.rs.IpAddr, boldGreen("SVID:"), r.rs.Svid, boldGreen("CVID:"), r.rs.Cvid, boldGreen("UP:"), wtB(up[0])+";", cyan(upTT+"(TT)"), boldGreen("DN:"), wtB(dn[0])+";", cyan(dn[1]+"(TT)"), yellow("MTU:"), wtHi(r.rs.Mtu))
 	}
 	r.rs = nil
 }
@@ -271,7 +271,7 @@ func addCommands(sh *ishell.Shell, r *Remotes) {
 	sh.AddCmd(discCmd)
 }
 
-var unamePatt *regexp.Regexp = regexp.MustCompile("^[0-9]{6}@gts$|^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
+var unamePatt *regexp.Regexp = regexp.MustCompile("^[0-9]{6}@gts$|^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})|(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 
 func checkUserMac(str string) error {
 	if !unamePatt.MatchString(str) {
